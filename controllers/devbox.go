@@ -12,6 +12,7 @@ import (
 	"golang.org/x/crypto/ssh"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/rest"
 
 	"github.com/casosorg/casos/object"
@@ -135,6 +136,8 @@ type deployDevboxRequest struct {
 	Repo      string `json:"repo"`
 	LocalPath string `json:"localPath"`
 	Branch    string `json:"branch"`
+	// Token reads a private Repo; it is kept in a Secret, never in the Deployment.
+	Token string `json:"token"`
 	// Setup runs once in the checkout, in the image, before the editor starts.
 	Setup string `json:"setup"`
 	// Password guards the editor. Empty means "generate one", handed back once
@@ -326,7 +329,22 @@ func deployDevbox(cfg *rest.Config, req deployDevboxRequest) (*deployDevboxResul
 		},
 	}
 
+	if token := strings.TrimSpace(req.Token); token != "" && env.source == devboxSourceGit {
+		if err := checkGitTokenRepo(env.repo); err != nil {
+			return nil, err
+		}
+		// Saving first would overwrite the token of an existing app with this name.
+		if _, err := object.GetDeployment(cfg, req.Namespace, req.Name); err == nil {
+			return nil, fmt.Errorf("%s already exists; pick another name", req.Name)
+		} else if !errors.IsNotFound(err) {
+			return nil, err
+		}
+		if err := saveGitToken(cfg, req.Namespace, req.Name, token); err != nil {
+			return nil, err
+		}
+	}
 	if _, err := deployAppWorkload(cfg, appReq, opts); err != nil {
+		forgetGitToken(cfg, req.Namespace, req.Name)
 		return nil, err
 	}
 

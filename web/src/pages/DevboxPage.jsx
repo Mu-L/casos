@@ -530,7 +530,7 @@ function DevboxPage() {
         {form.source === "git" ? (
           <div className="grid gap-4 sm:grid-cols-[1fr_12rem]">
             <Field
-              label={i18next.t("devbox:Repository")}
+              label={i18next.t("general:Repository")}
               htmlFor="devbox-repo"
               required
               hint={i18next.t("devbox:A public Git repository, cloned into the home disk on first start.")}
@@ -543,7 +543,7 @@ function DevboxPage() {
                 data-testid="devbox-repo-input"
               />
             </Field>
-            <Field label={i18next.t("devbox:Branch")} htmlFor="devbox-branch">
+            <Field label={i18next.t("general:Branch")} htmlFor="devbox-branch">
               <Input
                 id="devbox-branch"
                 value={form.branch}
@@ -556,7 +556,7 @@ function DevboxPage() {
         {form.source === "local" ? (
           <div className="grid gap-4 sm:grid-cols-[1fr_12rem]">
             <Field
-              label={i18next.t("devbox:Folder")}
+              label={i18next.t("general:Folder")}
               htmlFor="devbox-local-path"
               required
               hint={i18next.t("devbox:The full path of a Git repository on the computer running casos. Every committed branch is copied in; uncommitted changes stay where they are.")}
@@ -570,7 +570,7 @@ function DevboxPage() {
                 data-testid="devbox-local-path-input"
               />
             </Field>
-            <Field label={i18next.t("devbox:Branch")} htmlFor="devbox-local-branch">
+            <Field label={i18next.t("general:Branch")} htmlFor="devbox-local-branch">
               <Input
                 id="devbox-local-branch"
                 value={form.branch}
@@ -636,7 +636,7 @@ function DevboxPage() {
         <Collapsible>
           <CollapsibleTrigger className="text-muted-foreground hover:text-foreground group flex items-center gap-1 text-sm">
             <ChevronRight className="size-4 transition-transform group-data-[state=open]:rotate-90" />
-            {advanced ? i18next.t("devbox:Disk and password") : i18next.t("devbox:More options")}
+            {advanced ? i18next.t("devbox:Disk and password") : i18next.t("general:More options")}
           </CollapsibleTrigger>
           <CollapsibleContent className="grid gap-4 pt-4 sm:grid-cols-2">
             {advanced ? null : namespaceField}
@@ -744,7 +744,7 @@ function DevboxPage() {
             <DescriptionList
               items={[
                 {label: i18next.t("devbox:SSH"), value: <CodeText copyable>{sshCommand(connectTarget)}</CodeText>},
-                {label: i18next.t("devbox:Folder"), value: <CodeText copyable>{connectTarget.sshPath}</CodeText>},
+                {label: i18next.t("general:Folder"), value: <CodeText copyable>{connectTarget.sshPath}</CodeText>},
               ]}
             />
             <div className="space-y-1.5">

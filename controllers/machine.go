@@ -3,6 +3,7 @@ package controllers
 import (
 	"encoding/json"
 
+	"github.com/casosorg/casos/deploy"
 	"github.com/casosorg/casos/object"
 )
 
@@ -89,6 +90,17 @@ func (c *ApiController) DeleteMachine() {
 	err := json.Unmarshal(c.Ctx.Input.RequestBody, &machine)
 	if err != nil {
 		c.ResponseError(err.Error())
+		return
+	}
+
+	// A machine that joined over the internet also holds a node, a place on
+	// the overlay and a credential, which go with it.
+	if existing, err := object.GetMachine(machine.Owner + "/" + machine.Name); err == nil && existing != nil && existing.AuthType == object.MachineAuthTypeAgent {
+		if err := deploy.RemoveMeshMember(c.Ctx.Request.Context(), existing.Owner, existing.Name); err != nil {
+			c.ResponseError(err.Error())
+			return
+		}
+		c.ResponseOk(true)
 		return
 	}
 

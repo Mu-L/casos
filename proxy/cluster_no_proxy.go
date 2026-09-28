@@ -22,6 +22,8 @@ func EnsureClusterNoProxy() {
 		"10.0.0.0/8",
 		"172.16.0.0/12",
 		"192.168.0.0/16",
+		// The mesh overlay, where kubelets live when this is a hub.
+		"100.64.0.0/10",
 	}
 	existing := firstNonEmpty(os.Getenv("NO_PROXY"), os.Getenv("no_proxy"))
 	seen := map[string]bool{}

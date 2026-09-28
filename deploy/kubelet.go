@@ -36,7 +36,13 @@ maxParallelImagePulls: %d
 `, nodeDeployClusterDNS, nodeDeployMaxParallelImagePulls)
 }
 
-func kubeletService(nodeName string) string {
+// nodeIP pins the node's InternalIP, which the apiserver dials the kubelet at
+// and flannel tunnels to. Empty leaves the kubelet to pick its own.
+func kubeletService(nodeName, nodeIP string) string {
+	nodeIPFlag := ""
+	if nodeIP != "" {
+		nodeIPFlag = " \\\n  --node-ip=" + nodeIP
+	}
 	return fmt.Sprintf(`[Unit]
 Description=Kubernetes Kubelet
 After=containerd.service
@@ -53,12 +59,12 @@ ExecStart=/usr/local/bin/kubelet \
   --config=/var/lib/kubelet/config.yaml \
   --client-ca-file=/etc/kubernetes/ca.crt \
   --register-node=true \
-  --hostname-override=%s \
+  --hostname-override=%s%s \
   --v=2
 Restart=always
 RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
-`, nodeName)
+`, nodeName, nodeIPFlag)
 }

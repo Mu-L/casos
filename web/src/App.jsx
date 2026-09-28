@@ -2,6 +2,7 @@ import React, {Component, Suspense, lazy} from "react";
 import {Redirect, Route, Switch, withRouter} from "react-router-dom";
 import * as Setting from "@/Setting";
 import * as AccountBackend from "@/backend/AccountBackend";
+import * as MeshBackend from "@/backend/MeshBackend";
 import * as SiteBackend from "@/backend/SiteBackend";
 import {Toaster} from "@/components/ui/sonner";
 import {BackgroundInstallWatcher} from "@/components/shared/background-install-watcher";
@@ -16,6 +17,7 @@ import SigninPage from "@/pages/SigninPage";
 // The desktop pulls in the window manager and every app icon; a reader who
 // stays in the sidebar UI should never download it.
 const DesktopPage = lazy(() => import("@/pages/DesktopPage"));
+const MemberPage = lazy(() => import("@/pages/MemberPage"));
 
 class App extends Component {
   constructor(props) {
@@ -34,6 +36,7 @@ class App extends Component {
       themeAlgorithm,
       site: undefined,
       logo: Setting.getLogo(themeAlgorithm, null),
+      meshStatus: undefined,
     };
   }
 
@@ -80,7 +83,18 @@ class App extends Component {
   getAccount() {
     AccountBackend.getAccount().then((res) => {
       this.setState({account: res.data});
+      if (res.data) {
+        this.loadMeshStatus();
+      }
     });
+  }
+
+  // A member machine runs no cluster, so it shows its membership instead of
+  // the console, whose every page would fail.
+  loadMeshStatus() {
+    MeshBackend.getMeshStatus()
+      .then((res) => this.setState({meshStatus: res.status === "ok" ? res.data : null}))
+      .catch(() => this.setState({meshStatus: null}));
   }
 
   onUpdateAccount = () => {
@@ -125,10 +139,17 @@ class App extends Component {
       sessionStorage.setItem("from", window.location.pathname);
       return <Redirect to="/signin" />;
     }
-    if (this.state.account === undefined) {
+    if (this.state.account === undefined || this.state.meshStatus === undefined) {
       // The account request is still in flight; rendering nothing avoids a
       // one-frame redirect to the sign-in page on every reload.
       return null;
+    }
+    if (this.state.meshStatus?.role === "member") {
+      return (
+        <Suspense fallback={<Loading type="page" />}>
+          <MemberPage initialStatus={this.state.meshStatus} onSignout={this.signout} />
+        </Suspense>
+      );
     }
     return component;
   }

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -100,7 +101,15 @@ func Start(ctx context.Context, cfg Config) (<-chan struct{}, error) {
 		authzKubeconfig = ""
 	}
 
-	if err := fs.Parse(buildApiserverArgs(cfg, certDir, etcdEndpoint, authzKubeconfig)); err != nil {
+	args := buildApiserverArgs(cfg, certDir, etcdEndpoint, authzKubeconfig)
+	if cfg.EgressProxySocket != "" {
+		egressConfig, err := writeEgressSelectorConfig(certDir, cfg.EgressProxySocket)
+		if err != nil {
+			return nil, fmt.Errorf("egress selector config: %w", err)
+		}
+		args = append(args, "--egress-selector-config-file="+egressConfig)
+	}
+	if err := fs.Parse(args); err != nil {
 		return nil, fmt.Errorf("apiserver flag parse: %w", err)
 	}
 
@@ -184,6 +193,26 @@ func waitForAPIServer(ctx context.Context, base string) {
 			}
 		}
 	}
+}
+
+// writeEgressSelectorConfig routes the apiserver's connections to kubelets and
+// to anything it proxies into the cluster through the proxy on socket.
+func writeEgressSelectorConfig(certDir, socket string) (string, error) {
+	path := filepath.Join(certDir, "egress-selector.yaml")
+	content := fmt.Sprintf(`apiVersion: apiserver.k8s.io/v1beta1
+kind: EgressSelectorConfiguration
+egressSelections:
+- name: cluster
+  connection:
+    proxyProtocol: HTTPConnect
+    transport:
+      uds:
+        udsName: %s
+`, strconv.Quote(socket))
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		return "", err
+	}
+	return path, nil
 }
 
 func authzMode(kubeconfig string) string {

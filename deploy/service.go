@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/beego/beego/logs"
+	"github.com/casosorg/casos/mesh"
 	"github.com/casosorg/casos/object"
 	"k8s.io/client-go/rest"
 )
@@ -72,12 +73,8 @@ func (s *Service) PreflightMachineNode(req MachineNodeDeployRequest) (map[string
 		return nil, err
 	}
 	s.ensureApiserverHostFirewall(config)
-	if req.ApiserverURL == "" {
-		resolved, err := resolveMachineNodeApiserverURL(deployMachine, defaultNodeDeployApiserverURL(config))
-		if err != nil {
-			return nil, err
-		}
-		req.ApiserverURL = resolved
+	if err := resolveRequestApiserverURL(&req, deployMachine, config); err != nil {
+		return nil, err
 	}
 	deployer := NewNodeDeployer(config, nil, nil)
 	ctx, cancel := context.WithTimeout(s.contextSnapshot(), 30*time.Second)
@@ -111,12 +108,8 @@ func (s *Service) DeployMachineNode(req MachineNodeDeployRequest) (*object.Machi
 		return nil, err
 	}
 	firewall := s.ensureApiserverHostFirewall(config)
-	if req.ApiserverURL == "" {
-		resolved, err := resolveMachineNodeApiserverURL(deployMachine, defaultNodeDeployApiserverURL(config))
-		if err != nil {
-			return nil, err
-		}
-		req.ApiserverURL = resolved
+	if err := resolveRequestApiserverURL(&req, deployMachine, config); err != nil {
+		return nil, err
 	}
 
 	if !s.acquireDeploymentSlot() {
@@ -360,6 +353,10 @@ func toNodeDeployMachine(machine *object.Machine) (NodeDeployMachine, error) {
 	if machine.AuthType == object.MachineAuthTypeLocal {
 		return NodeDeployMachine{Host: machine.Ip, Username: machine.Username, Local: true}, nil
 	}
+	if machine.AuthType == object.MachineAuthTypeAgent {
+		id := machine.Owner + "/" + machine.Name
+		return NodeDeployMachine{Host: id, Agent: id}, nil
+	}
 	deployMachine := NodeDeployMachine{
 		Host:       machine.Ip,
 		Port:       machine.Port,
@@ -391,7 +388,7 @@ func getMachineForNodeDeploy(owner, machineName string) (*object.Machine, error)
 	if machine == nil {
 		return nil, fmt.Errorf("machine not found")
 	}
-	if machine.AuthType == object.MachineAuthTypeLocal {
+	if machine.AuthType == object.MachineAuthTypeLocal || machine.AuthType == object.MachineAuthTypeAgent {
 		return machine, nil
 	}
 	if machine.Ip == "" || machine.Username == "" {
@@ -419,6 +416,26 @@ func resolveMachineNodeApiserverURL(machine NodeDeployMachine, fallbackURL strin
 	}
 	defer runner.Close()
 	return ResolveNodeDeployApiserverURL(ctx, runner, fallbackURL), nil
+}
+
+// resolveRequestApiserverURL fills in the address the node reaches the
+// apiserver at. On a mesh that is always the hub's overlay address: a URL
+// kept from before the hub existed would point at an address remote nodes
+// cannot reach.
+func resolveRequestApiserverURL(req *MachineNodeDeployRequest, deployMachine NodeDeployMachine, config Config) error {
+	if hub := mesh.CurrentHub(); hub != nil {
+		req.ApiserverURL = meshApiserverURL(hub, config.ApiserverPort)
+		return nil
+	}
+	if req.ApiserverURL != "" {
+		return nil
+	}
+	resolved, err := resolveMachineNodeApiserverURL(deployMachine, defaultNodeDeployApiserverURL(config))
+	if err != nil {
+		return err
+	}
+	req.ApiserverURL = resolved
+	return nil
 }
 
 func defaultNodeDeployApiserverURL(config Config) string {

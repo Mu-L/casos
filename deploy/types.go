@@ -101,6 +101,9 @@ type NodeDeployMachine struct {
 	// Local marks the CasOS host itself, which is deployed through a local
 	// shell instead of SSH and therefore needs no credential.
 	Local bool
+	// Agent is the id of a machine that joined a mesh hub, which is deployed
+	// through the connection it keeps open to the hub.
+	Agent string
 }
 
 type NodeDeployResult struct {

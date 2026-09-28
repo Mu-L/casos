@@ -6,7 +6,7 @@ import (
 )
 
 func TestKubeletServiceEnablesSharedMountPropagation(t *testing.T) {
-	service := kubeletService("worker-1")
+	service := kubeletService("worker-1", "")
 	if !strings.Contains(service, "ExecStartPre=/bin/mount --make-rshared /") {
 		t.Fatalf("kubelet service must prepare CSI mount propagation:\n%s", service)
 	}

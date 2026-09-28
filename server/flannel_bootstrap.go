@@ -199,7 +199,7 @@ mv -f "$tmp" /etc/cni/net.d/10-flannel.conflist`},
 	}
 	flannel := corev1.Container{
 		Name: "kube-flannel", Image: flannelDaemonImage, ImagePullPolicy: corev1.PullIfNotPresent,
-		Command: []string{"/opt/bin/flanneld"}, Args: []string{"--ip-masq", "--kube-subnet-mgr", "--kubeconfig-file=/etc/kube-flannel/kubeconfig"},
+		Command: []string{"/opt/bin/flanneld"}, Args: flannelArgs(cfg),
 		Env:             flannelEnv(cfg),
 		SecurityContext: &corev1.SecurityContext{Privileged: ptr(true)},
 		Ports:           []corev1.ContainerPort{{Name: "vxlan", ContainerPort: 8472, Protocol: corev1.ProtocolUDP}},
@@ -239,6 +239,16 @@ func flannelResources(requestCPU, requestMemory, limitCPU, limitMemory string) c
 		Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse(requestCPU), corev1.ResourceMemory: resource.MustParse(requestMemory)},
 		Limits:   corev1.ResourceList{corev1.ResourceCPU: resource.MustParse(limitCPU), corev1.ResourceMemory: resource.MustParse(limitMemory)},
 	}
+}
+
+func flannelArgs(cfg Config) []string {
+	args := []string{"--ip-masq", "--kube-subnet-mgr", "--kubeconfig-file=/etc/kube-flannel/kubeconfig"}
+	// On a mesh every node reaches the hub over the overlay interface, so the
+	// interface that routes to the hub is the one VXLAN has to run over.
+	if cfg.MeshOverlayIP != "" {
+		args = append(args, "--iface-can-reach="+cfg.MeshOverlayIP)
+	}
+	return args
 }
 
 func flannelEnv(cfg Config) []corev1.EnvVar {

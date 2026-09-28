@@ -188,6 +188,8 @@ get that build and run it under emulation; an arm64 Linux host has to
   binary. No external cluster and no `kubeadm`.
 - **Zero-configuration worker node** — the machine you start CasOS on joins the
   cluster by itself; more machines are added over SSH from the **Machines** page.
+- **One cloud from many computers** — CasOS on other computers joins with one
+  invite, even from behind NAT on the other side of the internet (see below).
 - **App Store** — install and manage Helm releases from the UI.
 - **Full resource management** — Deployments, StatefulSets, DaemonSets, Jobs,
   CronJobs, Pods, Services, Ingresses, ConfigMaps, Secrets, PVCs, StorageClasses,
@@ -199,6 +201,35 @@ get that build and run it under emulation; an arm64 Linux host has to
 - **Sign-in that needs no setup** — a built-in `admin` account out of the box, with
   optional [Casdoor](https://casdoor.org) single sign-on.
 - **Multi-language UI** (i18n).
+
+## One cloud from many computers
+
+CasOS on several computers can form a single cloud, whether they share a LAN or
+not. One of them is the **hub**: it runs the control plane, and every other
+computer joins it as a worker node.
+
+1. On the hub, open **Machines → Make this a cloud hub** and enter the address
+   other computers reach it at (a public IP or domain). Open TCP 20444 and UDP
+   3478 to it. CasOS restarts as the hub.
+2. Click **Invite a computer**. It shows a command such as
+   `casos join https://203.0.113.10:20444 casos1.…`.
+3. On the other computer, run that command next to its `casos` binary and start
+   CasOS, or paste it into **Machines → Join a cloud**. A minute or two later the
+   computer is a Ready node on the hub.
+
+How it works: the hub embeds a [Headscale](https://github.com/juanfont/headscale)
+coordination server and relay, and every node runs the Tailscale client, so nodes
+reach each other over WireGuard — directly when NAT allows, through the hub's
+relay when it does not. Kubelets, the apiserver and pod traffic (Flannel VXLAN)
+all use that overlay. A joining computer only dials out: the hub deploys its node
+through the connection the computer keeps open, so it needs neither a public
+address nor an SSH server. The invite carries the fingerprint of the hub's CA, so
+a hub with no domain and a self-signed certificate is still authenticated.
+Tailscale's own log upload is switched off; nothing leaves your machines except
+traffic between them.
+
+A member computer runs no cluster of its own; its web page shows which cloud it
+belongs to and a **Leave** button that turns it back into a standalone CasOS.
 
 ## Configuration
 

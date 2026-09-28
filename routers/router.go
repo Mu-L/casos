@@ -158,6 +158,14 @@ func InitAPI() {
 	beego.Router("/api/get-machine-node-tasks", &controllers.ApiController{}, "GET:GetMachineNodeTasks")
 	beego.Router("/api/get-machine-node-logs", &controllers.ApiController{}, "GET:GetMachineNodeLogs")
 
+	beego.Router("/api/get-mesh-status", &controllers.ApiController{}, "GET:GetMeshStatus")
+	beego.Router("/api/add-mesh-invite", &controllers.ApiController{}, "POST:AddMeshInvite")
+	beego.Router("/api/get-mesh-invites", &controllers.ApiController{}, "GET:GetMeshInvites")
+	beego.Router("/api/delete-mesh-invite", &controllers.ApiController{}, "POST:DeleteMeshInvite")
+	beego.Router("/api/enable-mesh-hub", &controllers.ApiController{}, "POST:EnableMeshHub")
+	beego.Router("/api/join-mesh", &controllers.ApiController{}, "POST:JoinMesh")
+	beego.Router("/api/leave-mesh", &controllers.ApiController{}, "POST:LeaveMesh")
+
 	beego.Router("/api/get-configmaps", &controllers.ApiController{}, "GET:GetConfigMaps")
 	beego.Router("/api/get-configmap", &controllers.ApiController{}, "GET:GetConfigMap")
 	beego.Router("/api/add-configmap", &controllers.ApiController{}, "POST:AddConfigMap")

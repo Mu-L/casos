@@ -389,7 +389,7 @@ printf unmanaged`, shellSingleQuote(path), shellSingleQuote(generatedRegistryHos
 	}
 }
 
-func (d *NodeDeployer) writeNodeFiles(ctx context.Context, runner NodeDeployRunner, nodeName, kubeconfig string) error {
+func (d *NodeDeployer) writeNodeFiles(ctx context.Context, runner NodeDeployRunner, nodeName, nodeIP, kubeconfig string) error {
 	ca, err := extractCertificateAuthority(kubeconfig)
 	if err != nil {
 		return err
@@ -403,7 +403,7 @@ func (d *NodeDeployer) writeNodeFiles(ctx context.Context, runner NodeDeployRunn
 	if err = runner.WriteFileContext(ctx, "/var/lib/kubelet/config.yaml", kubeletConfig(), "0644"); err != nil {
 		return fmt.Errorf("write /var/lib/kubelet/config.yaml: %w", err)
 	}
-	if err = runner.WriteFileContext(ctx, "/etc/systemd/system/kubelet.service", kubeletService(nodeName), "0644"); err != nil {
+	if err = runner.WriteFileContext(ctx, "/etc/systemd/system/kubelet.service", kubeletService(nodeName, nodeIP), "0644"); err != nil {
 		return fmt.Errorf("write /etc/systemd/system/kubelet.service: %w", err)
 	}
 	if err = runner.WriteFileContext(ctx, "/var/lib/kube-proxy/config.yaml", kubeProxyConfig(), "0644"); err != nil {

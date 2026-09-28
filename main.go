@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"os"
 	"os/signal"
 	"runtime"
 	"syscall"
@@ -18,6 +19,7 @@ import (
 	"github.com/casosorg/casos/conf"
 	"github.com/casosorg/casos/controllers"
 	"github.com/casosorg/casos/deploy"
+	"github.com/casosorg/casos/mesh"
 	"github.com/casosorg/casos/object"
 	"github.com/casosorg/casos/proxy"
 	"github.com/casosorg/casos/routers"
@@ -71,6 +73,9 @@ func main() {
 		fmt.Println(versionString())
 		return
 	}
+	if args := flag.Args(); len(args) > 0 && args[0] == "join" {
+		os.Exit(runJoinCommand(args[1:]))
+	}
 
 	proxy.EnsureClusterNoProxy()
 	object.InitAdapter()
@@ -102,6 +107,21 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 	go server.ShutdownOnSignal(ctx, stop)
+
+	meshCfg, err := mesh.ConfigFromAppConf(srvCfg.DataDir, srvCfg.ApiserverPort)
+	if err != nil {
+		panic(err)
+	}
+	controllers.SetMeshConfig(meshCfg)
+	if meshCfg.Role == mesh.RoleMember {
+		runMeshMember(ctx, meshCfg, srvCfg)
+		return
+	}
+	if meshCfg.Role == mesh.RoleHub {
+		if err := startMeshHub(ctx, meshCfg, &srvCfg); err != nil {
+			panic(err)
+		}
+	}
 	deploy.Init(ctx, deploy.ConfigFromServerConfig(srvCfg))
 
 	readyCh, err := server.Start(ctx, srvCfg)
@@ -150,12 +170,20 @@ func main() {
 		}
 	}()
 
+	serveWeb(fmt.Sprintf("https://127.0.0.1:%d", srvCfg.ApiserverPort))
+}
+
+// serveWeb runs the web UI and the REST API until the process ends. A member
+// has no control plane, so it passes no apiserver origin and gets neither the
+// Kubernetes proxy nor the gateways that forward into the cluster.
+func serveWeb(apiserverOrigin string) {
 	routers.InitAPI()
 
-	apiserverOrigin := fmt.Sprintf("https://127.0.0.1:%d", srvCfg.ApiserverPort)
 	beego.InsertFilter("*", beego.BeforeRouter, routers.CorsFilter)
-	beego.InsertFilter("/k8s", beego.BeforeRouter, routers.K8sProxyFilter(apiserverOrigin))
-	beego.InsertFilter("/k8s/*", beego.BeforeRouter, routers.K8sProxyFilter(apiserverOrigin))
+	if apiserverOrigin != "" {
+		beego.InsertFilter("/k8s", beego.BeforeRouter, routers.K8sProxyFilter(apiserverOrigin))
+		beego.InsertFilter("/k8s/*", beego.BeforeRouter, routers.K8sProxyFilter(apiserverOrigin))
+	}
 	beego.InsertFilter("/", beego.BeforeRouter, routers.StaticFilter)
 	beego.InsertFilter("/*", beego.BeforeRouter, routers.StaticFilter)
 	beego.InsertFilter("/api/*", beego.BeforeRouter, routers.ApiFilter)
@@ -179,7 +207,71 @@ func main() {
 	if util.StartedByDoubleClick() {
 		go openWhenReady(port)
 	}
+	if apiserverOrigin == "" {
+		beego.RunWithMiddleWares(fmt.Sprintf(":%v", port))
+		return
+	}
 	beego.RunWithMiddleWares(fmt.Sprintf(":%v", port), routers.AppGateway, routers.MCP(version), routers.AIGateway)
+}
+
+// runMeshMember runs this machine as a member of another CasOS's cloud: no
+// control plane of its own, only the connection through which the hub turns
+// this machine into one of its nodes.
+func runMeshMember(ctx context.Context, meshCfg mesh.Config, srvCfg server.Config) {
+	m, err := mesh.LoadMembership(meshCfg.DataDir)
+	if err != nil || m == nil {
+		panic(fmt.Errorf("read cloud membership: %v", err))
+	}
+	deploy.Init(ctx, deploy.ConfigFromServerConfig(srvCfg))
+	go deploy.RunMeshMember(ctx, m)
+	logs.Info("this machine is a member of the cloud at %s; manage it from %s", m.HubURL, m.ConsoleURL)
+	serveWeb("")
+}
+
+// runJoinCommand implements "casos join <url> <token>", which records the
+// membership; the machine joins when CasOS next starts.
+func runJoinCommand(args []string) int {
+	if len(args) != 2 {
+		fmt.Fprintln(os.Stderr, "usage: casos join <cloud address> <invite>")
+		return 2
+	}
+	meshCfg, err := mesh.ConfigFromAppConf(conf.GetDataDir(), 0)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if meshCfg.Role != mesh.RoleStandalone {
+		fmt.Fprintf(os.Stderr, "this CasOS is already a cloud %s\n", meshCfg.Role)
+		return 1
+	}
+	hostname, _ := os.Hostname()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	m, err := mesh.Join(ctx, meshCfg, args[0], args[1], hostname, runtime.GOOS)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Printf("Joined the cloud at %s as %s.\nStart CasOS (or restart it if it is running) to turn this machine into one of its nodes.\n", m.HubURL, m.Machine)
+	return 0
+}
+
+// startMeshHub has to finish before the apiserver starts, because the
+// apiserver advertises the hub's overlay address.
+func startMeshHub(ctx context.Context, meshCfg mesh.Config, srvCfg *server.Config) error {
+	caCert, caKey, err := server.ClusterCA(*srvCfg)
+	if err != nil {
+		return fmt.Errorf("cluster CA: %w", err)
+	}
+	hub, err := mesh.StartHub(ctx, meshCfg, caCert, caKey)
+	if err != nil {
+		return fmt.Errorf("mesh hub: %w", err)
+	}
+	deploy.RegisterMeshEndpoints(hub)
+	srvCfg.AdvertiseAddress = hub.OverlayIP().String()
+	srvCfg.MeshOverlayIP = srvCfg.AdvertiseAddress
+	srvCfg.EgressProxySocket = hub.EgressProxySocket()
+	return nil
 }
 
 // defaultHTTPPort is where the web UI and the REST API listen when nothing

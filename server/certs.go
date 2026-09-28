@@ -423,6 +423,44 @@ func AdminRestConfig(cfg Config) *rest.Config {
 	}
 }
 
+// ClusterCA returns the cluster CA, creating it on a first start. It is safe to
+// call before Start, which is what lets the mesh hub sign its certificate
+// before the apiserver runs.
+func ClusterCA(cfg Config) (*x509.Certificate, *rsa.PrivateKey, error) {
+	certDir := filepath.Join(cfg.DataDir, "tls")
+	if err := os.MkdirAll(certDir, 0o700); err != nil {
+		return nil, nil, fmt.Errorf("mkdir tls: %w", err)
+	}
+	if err := ensureCerts(certDir, cfg.ApiserverBind, cfg.AdvertiseAddress); err != nil {
+		return nil, nil, err
+	}
+	keyPEM, err := os.ReadFile(filepath.Join(certDir, "ca.key"))
+	if err != nil {
+		return nil, nil, err
+	}
+	block, _ := pem.Decode(keyPEM)
+	if block == nil {
+		return nil, nil, fmt.Errorf("ca.key is not PEM")
+	}
+	key, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	if err != nil {
+		return nil, nil, fmt.Errorf("parse ca.key: %w", err)
+	}
+	certPEM, err := os.ReadFile(filepath.Join(certDir, "ca.crt"))
+	if err != nil {
+		return nil, nil, err
+	}
+	block, _ = pem.Decode(certPEM)
+	if block == nil {
+		return nil, nil, fmt.Errorf("ca.crt is not PEM")
+	}
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return nil, nil, fmt.Errorf("parse ca.crt: %w", err)
+	}
+	return cert, key, nil
+}
+
 func writePEM(path, typ string, der []byte) error {
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 	if err != nil {

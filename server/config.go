@@ -32,6 +32,8 @@ type Config struct {
 	RegistryMirrorMode        RegistryMirrorMode // imageRegistryMirror mode, evaluated on each target worker
 	IngressControllerEnabled  bool               // install the built-in Traefik controller
 	ServiceLBEnabled          bool               // run the built-in bare-metal LoadBalancer controller
+	MeshOverlayIP             string             // the hub's overlay address when this is a mesh hub, else empty
+	EgressProxySocket         string             // Unix socket of an HTTP CONNECT proxy for the apiserver's traffic to the cluster, else empty
 }
 
 // CasOS keeps every port it binds on a fixed number in one 20000 block, rather

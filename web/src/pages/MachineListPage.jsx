@@ -19,6 +19,7 @@ import {PasswordInput} from "@/components/shared/password-input";
 import {SimpleSelect} from "@/components/shared/simple-select";
 import {MachineNodeDeploySheet} from "@/components/shared/machine-node-deploy-sheet";
 import {LocalWSLEnrollDialog} from "@/components/shared/local-wsl-enroll-dialog";
+import {CloudCard} from "@/components/shared/cloud-card";
 
 export const MACHINE_STATUS_VARIANTS = {
   Online: "success",
@@ -247,8 +248,25 @@ function MachineListPage({account}) {
       ),
     },
     {key: "displayName", title: i18next.t("general:Display name"), dataIndex: "displayName", width: 180},
-    {key: "ip", title: i18next.t("machine:IP address"), dataIndex: "ip", width: 160, className: "font-mono text-xs"},
-    {key: "port", title: i18next.t("machine:SSH port"), dataIndex: "port", width: 110, align: "right"},
+    {
+      key: "ip",
+      title: i18next.t("machine:IP address"),
+      dataIndex: "ip",
+      width: 160,
+      className: "font-mono text-xs",
+      // A machine that joined over the internet is reached through its own
+      // connection to this hub, not at an address.
+      render: (value, record) =>
+        record.authType === "agent" ? <Badge variant="info">{i18next.t("machine:Joined over the internet")}</Badge> : value,
+    },
+    {
+      key: "port",
+      title: i18next.t("machine:SSH port"),
+      dataIndex: "port",
+      width: 110,
+      align: "right",
+      render: (value, record) => (record.authType === "agent" ? "" : value),
+    },
     {key: "username", title: i18next.t("general:Username"), dataIndex: "username", width: 140},
     {key: "role", title: i18next.t("policy:Role"), dataIndex: "role", width: 130, sortable: true},
     {
@@ -293,6 +311,7 @@ function MachineListPage({account}) {
 
   return (
     <PageContainer>
+      <CloudCard onChanged={refresh} />
       <DataTable
         testId="machines-table"
         title={i18next.t("general:Machines")}

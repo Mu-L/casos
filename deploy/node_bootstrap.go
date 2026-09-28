@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/casosorg/casos/mesh"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -50,6 +51,9 @@ func (d *NodeDeployer) Preflight(ctx context.Context, opts NodeDeployOptions) (*
 		return nil, err
 	}
 	defer runner.Close()
+	if mesh.CurrentHub() != nil {
+		return RunNodeDeployPreflight(ctx, runner, "")
+	}
 	return RunNodeDeployPreflight(ctx, runner, opts.ApiserverURL)
 }
 
@@ -69,8 +73,15 @@ func (d *NodeDeployer) Deploy(ctx context.Context, opts NodeDeployOptions) (*Nod
 	}
 	defer runner.Close()
 
+	// On a mesh the apiserver is reachable only once the node is on the
+	// overlay, so reachability is checked after that step instead.
+	hub := mesh.CurrentHub()
+	preflightURL := opts.ApiserverURL
+	if hub != nil {
+		preflightURL = ""
+	}
 	d.logStep(nodeDeployPhasePreflight, "Starting node preflight")
-	preflightResult, err := RunNodeDeployPreflight(ctx, runner, opts.ApiserverURL)
+	preflightResult, err := RunNodeDeployPreflight(ctx, runner, preflightURL)
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +105,13 @@ func (d *NodeDeployer) Deploy(ctx context.Context, opts NodeDeployOptions) (*Nod
 	if err != nil {
 		return nil, err
 	}
-	if err = d.writeNodeFiles(ctx, runner, opts.NodeName, wk.Kubeconfig); err != nil {
+	nodeIP := ""
+	if hub != nil {
+		if nodeIP, err = d.installMeshOverlay(ctx, runner, hub, opts.NodeName, preflightResult.Arch, opts.ApiserverURL); err != nil {
+			return nil, err
+		}
+	}
+	if err = d.writeNodeFiles(ctx, runner, opts.NodeName, nodeIP, wk.Kubeconfig); err != nil {
 		return nil, err
 	}
 
@@ -133,7 +150,7 @@ func (d *NodeDeployer) Deploy(ctx context.Context, opts NodeDeployOptions) (*Nod
 	// The CasOS host is deployed through a local shell rather than a login, so
 	// there is no session to keep working and no key to leave behind.
 	result := &NodeDeployResult{}
-	if !opts.Machine.Local {
+	if !opts.Machine.Local && opts.Machine.Agent == "" {
 		d.logStep(nodeDeployPhaseConfiguring, "Writing CasOS managed SSH key")
 		keyPair, err := GenerateNodeDeployKeyPair()
 		if err != nil {
@@ -291,6 +308,9 @@ func flannelPodReadinessReason(pod *corev1.Pod) string {
 }
 
 func newRunnerForMachine(machine NodeDeployMachine) (NodeDeployRunner, error) {
+	if machine.Agent != "" {
+		return NewAgentRunner(machine.Agent)
+	}
 	if machine.Local {
 		return NewNodeDeployLocalRunner()
 	}

@@ -91,6 +91,14 @@ func AcceptAgent(w http.ResponseWriter, r *http.Request, id string) (*AgentSessi
 
 func (s *AgentSession) Done() <-chan struct{} { return s.done }
 
+// DropAgent closes the session of member id, if it has one, so a machine the
+// hub no longer knows finds out the next time it tries to reconnect.
+func DropAgent(id string) {
+	if s := Agent(id); s != nil {
+		s.close()
+	}
+}
+
 func (s *AgentSession) readLoop() {
 	defer s.close()
 	_ = s.conn.SetReadDeadline(time.Now().Add(agentReadWait))

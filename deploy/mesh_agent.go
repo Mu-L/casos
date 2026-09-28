@@ -188,6 +188,7 @@ func RemoveMeshMember(ctx context.Context, owner, name string) error {
 	if _, err := object.DeleteMeshMember(owner, name); err != nil {
 		return err
 	}
+	mesh.DropAgent(owner + "/" + name)
 	if _, err := object.DeleteMachine(&object.Machine{Owner: owner, Name: name}); err != nil {
 		return err
 	}

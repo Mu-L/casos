@@ -493,13 +493,13 @@ export default function HelmReleasePage() {
     } else if (release.kind === "template") {
       uninstalled = TemplateBackend.deleteTemplateInstance({namespace: release.namespace, name: release.name, deleteData});
     } else if (release.kind === "install") {
-      uninstalled = HelmBackend.deleteHelmOperationTask(release.task.id);
+      uninstalled = HelmBackend.deleteFailedHelmInstall(release.task.id);
     } else {
       uninstalled = HelmBackend.uninstallHelmRelease({releaseName: release.name, namespace: release.namespace, deleteData});
     }
     return uninstalled.then((res) => {
       if (res.status === "ok") {
-        Setting.showMessage("success", `Uninstalled ${release.name}`);
+        Setting.showMessage("success", `${release.kind === "install" ? "Removed" : "Uninstalled"} ${release.name}`);
         fetchReleases();
       } else {
         setError(res.msg);
@@ -629,34 +629,50 @@ export default function HelmReleasePage() {
               </Button>
             </SimpleTooltip>
           )}
-          <ConfirmDialog
-            title={t("helm:Uninstall release?")}
-            description={`${release.name} (${release.namespace})`}
-            extra={
-              <label className="hover:bg-accent/50 flex cursor-pointer items-start gap-2 rounded-md px-2 py-1.5 text-sm">
-                <Checkbox
-                  className="mt-0.5"
-                  checked={deleteDataFor[releaseKey(release)] ?? false}
-                  onCheckedChange={(checked) =>
-                    setDeleteDataFor((previous) => ({...previous, [releaseKey(release)]: checked === true}))
-                  }
-                />
-                <span>
-                  {t("helm:Also delete this app's data")}
-                  <span className="text-muted-foreground block text-xs">
-                    {t("helm:Its volumes are kept by default, and reinstalling this app will reuse them")}
+          {release.kind === "install" ? (
+            release.status === "failed" ? (
+              <ConfirmDialog
+                title={t("helm:Remove failed install?")}
+                description={`${release.name} (${release.namespace}): ${t("helm:Its record and logs are removed from the list")}`}
+                confirmText={t("general:Remove")}
+                cancelText={t("general:Cancel")}
+                onConfirm={() => handleUninstall(release)}
+              >
+                <Button variant="outline" size="icon-sm" className="text-destructive" aria-label="Remove">
+                  <Trash2 className="size-4" />
+                </Button>
+              </ConfirmDialog>
+            ) : null
+          ) : (
+            <ConfirmDialog
+              title={t("helm:Uninstall release?")}
+              description={`${release.name} (${release.namespace})`}
+              extra={
+                <label className="hover:bg-accent/50 flex cursor-pointer items-start gap-2 rounded-md px-2 py-1.5 text-sm">
+                  <Checkbox
+                    className="mt-0.5"
+                    checked={deleteDataFor[releaseKey(release)] ?? false}
+                    onCheckedChange={(checked) =>
+                      setDeleteDataFor((previous) => ({...previous, [releaseKey(release)]: checked === true}))
+                    }
+                  />
+                  <span>
+                    {t("helm:Also delete this app's data")}
+                    <span className="text-muted-foreground block text-xs">
+                      {t("helm:Its volumes are kept by default, and reinstalling this app will reuse them")}
+                    </span>
                   </span>
-                </span>
-              </label>
-            }
-            confirmText={t("general:Delete")}
-            cancelText={t("general:Cancel")}
-            onConfirm={() => handleUninstall(release)}
-          >
-            <Button variant="outline" size="icon-sm" className="text-destructive" aria-label="Uninstall">
-              <Trash2 className="size-4" />
-            </Button>
-          </ConfirmDialog>
+                </label>
+              }
+              confirmText={t("general:Delete")}
+              cancelText={t("general:Cancel")}
+              onConfirm={() => handleUninstall(release)}
+            >
+              <Button variant="outline" size="icon-sm" className="text-destructive" aria-label="Uninstall">
+                <Trash2 className="size-4" />
+              </Button>
+            </ConfirmDialog>
+          )}
         </div>
       ),
     },

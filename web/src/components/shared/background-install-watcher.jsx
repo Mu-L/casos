@@ -4,7 +4,7 @@ import {useHistory} from "react-router-dom";
 import {toast} from "sonner";
 import * as HelmBackend from "@/backend/HelmBackend";
 import {useUiMode} from "@/hooks/use-ui-mode";
-import {listStoredHelmInstalls, removeStoredHelmTask} from "@/lib/helmTaskStorage";
+import {claimStoredHelmTask, listStoredHelmInstalls} from "@/lib/helmTaskStorage";
 
 const POLL_INTERVAL = 5000;
 const TASK_NOT_FOUND_CODE = "helm_task_not_found";
@@ -34,16 +34,18 @@ export function BackgroundInstallWatcher({enabled}) {
             .then((res) => {
               if (res.status !== "ok") {
                 if (res.data === TASK_NOT_FOUND_CODE) {
-                  removeStoredHelmTask(stored.key);
+                  claimStoredHelmTask(stored.key, stored.taskId);
                 }
                 return;
               }
               const task = res.data;
-              if (task?.status === "succeeded") {
-                removeStoredHelmTask(stored.key);
+              const finished = task?.status === "succeeded" || task?.status === "failed";
+              if (!finished || !claimStoredHelmTask(stored.key, stored.taskId)) {
+                return;
+              }
+              if (task.status === "succeeded") {
                 toast.success(t("helm:{{name}} is installed", {name: stored.releaseName}), {action});
-              } else if (task?.status === "failed") {
-                removeStoredHelmTask(stored.key);
+              } else {
                 toast.error(t("helm:{{name}} failed to install", {name: stored.releaseName}), {
                   description: task.errorMsg?.slice(0, 300),
                   duration: 15000,

@@ -44,9 +44,11 @@ func isSupportedHelmOperation(operation string) bool {
 }
 
 var (
-	ErrHelmOperationAlreadyActive   = errors.New("Helm operation already active")
-	ErrHelmOperationAlreadyFinished = errors.New("Helm operation already finished")
-	ErrHelmOperationStillRunning    = errors.New("Helm operation is still running")
+	ErrHelmOperationAlreadyActive    = errors.New("Helm operation already active")
+	ErrHelmOperationAlreadyFinished  = errors.New("Helm operation already finished")
+	ErrHelmOperationStillRunning     = errors.New("Helm operation is still running")
+	ErrHelmOperationNotFound         = errors.New("Helm operation task not found")
+	ErrHelmOperationNotFailedInstall = errors.New("only a failed install can be removed")
 )
 
 type HelmOperationTask struct {
@@ -230,17 +232,40 @@ func GetUnfinishedHelmInstalls(namespace string) ([]*HelmOperationTask, error) {
 	return unfinished, nil
 }
 
-func DeleteFinishedHelmOperationTask(id int64) error {
-	affected, err := ormer.Engine.ID(id).
-		In("status", HelmOperationStatusSucceeded, HelmOperationStatusFailed).
-		Delete(&HelmOperationTask{})
+// Every failed install of the release goes, not just this one: GetUnfinishedHelmInstalls shows the
+// latest remaining task, so an earlier failed attempt would otherwise take its place on the list.
+func DeleteFailedHelmInstall(id int64) error {
+	task, err := GetHelmOperationTask(id)
 	if err != nil {
 		return err
 	}
-	if affected == 0 {
+	if task == nil {
+		return ErrHelmOperationNotFound
+	}
+	if task.Status == HelmOperationStatusPending || task.Status == HelmOperationStatusRunning {
 		return ErrHelmOperationStillRunning
 	}
-	_, err = ormer.Engine.Where("task_id = ?", id).Delete(&HelmOperationLog{})
+	if task.Operation != HelmOperationInstall || task.Status != HelmOperationStatusFailed {
+		return ErrHelmOperationNotFailedInstall
+	}
+	_, err = withHelmOperationTransaction(func(session *xorm.Session) (interface{}, error) {
+		ids := []int64{}
+		if err := session.Table(&HelmOperationTask{}).
+			Where("namespace = ? AND release_name = ? AND operation = ? AND status = ?",
+				task.Namespace, task.ReleaseName, HelmOperationInstall, HelmOperationStatusFailed).
+			Cols("id").
+			Find(&ids); err != nil {
+			return nil, err
+		}
+		if len(ids) == 0 {
+			return nil, nil
+		}
+		if _, err := session.In("task_id", ids).Delete(&HelmOperationLog{}); err != nil {
+			return nil, err
+		}
+		_, err := session.In("id", ids).Delete(&HelmOperationTask{})
+		return nil, err
+	})
 	return err
 }
 

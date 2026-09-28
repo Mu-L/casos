@@ -186,33 +186,54 @@ function AppCard({release, resources, pending, onOpenLogs, onUpgrade, onToggleRu
             <ScrollText />
           </Button>
         </SimpleTooltip>
-        <ConfirmDialog
-          title={t("simple:Remove {{name}}?", {name: release.name})}
-          description={t("simple:The app stops running and disappears from this list.")}
-          extra={
-            <label className="hover:bg-accent/50 flex cursor-pointer items-start gap-2 rounded-md px-2 py-1.5 text-sm">
-              <Checkbox className="mt-0.5" checked={deleteData} onCheckedChange={(checked) => onDeleteDataChange(checked === true)} />
-              <span>
-                {t("simple:Also delete its data")}
-                <span className="text-muted-foreground block text-xs">
-                  {t("simple:Leave this off and the data is kept, ready for when you install it again.")}
+        {release.kind === "install" ? (
+          release.status === "failed" ? (
+            <ConfirmDialog
+              title={t("helm:Remove failed install?")}
+              description={t("helm:Its record and logs are removed from the list")}
+              confirmText={t("general:Remove")}
+              cancelText={t("general:Cancel")}
+              onConfirm={() => onUninstall(release)}
+            >
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                aria-label={t("general:Remove")}
+              >
+                <Trash2 />
+              </Button>
+            </ConfirmDialog>
+          ) : null
+        ) : (
+          <ConfirmDialog
+            title={t("simple:Remove {{name}}?", {name: release.name})}
+            description={t("simple:The app stops running and disappears from this list.")}
+            extra={
+              <label className="hover:bg-accent/50 flex cursor-pointer items-start gap-2 rounded-md px-2 py-1.5 text-sm">
+                <Checkbox className="mt-0.5" checked={deleteData} onCheckedChange={(checked) => onDeleteDataChange(checked === true)} />
+                <span>
+                  {t("simple:Also delete its data")}
+                  <span className="text-muted-foreground block text-xs">
+                    {t("simple:Leave this off and the data is kept, ready for when you install it again.")}
+                  </span>
                 </span>
-              </span>
-            </label>
-          }
-          confirmText={t("general:Delete")}
-          cancelText={t("general:Cancel")}
-          onConfirm={() => onUninstall(release)}
-        >
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-            aria-label={t("general:Remove")}
+              </label>
+            }
+            confirmText={t("general:Delete")}
+            cancelText={t("general:Cancel")}
+            onConfirm={() => onUninstall(release)}
           >
-            <Trash2 />
-          </Button>
-        </ConfirmDialog>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+              aria-label={t("general:Remove")}
+            >
+              <Trash2 />
+            </Button>
+          </ConfirmDialog>
+        )}
       </div>
     </div>
   );

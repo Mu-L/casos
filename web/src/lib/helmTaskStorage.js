@@ -16,6 +16,19 @@ export const removeStoredHelmTask = key => {
   }
 };
 
+// Every open tab polls the same entries, so only the tab that still finds this task's entry reports
+// on it. Matching the task id also keeps a newer install under the same name from being dropped.
+export const claimStoredHelmTask = (key, taskId) => {
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(key));
+    if (String(stored?.taskId ?? "") !== String(taskId)) {return false;}
+    window.localStorage.removeItem(key);
+    return true;
+  } catch (_) {
+    return false;
+  }
+};
+
 export const helmTaskMatchesIdentity = (task, taskId, expectedIdentity) => Boolean(
   task && expectedIdentity &&
   String(task.id) === String(taskId) &&

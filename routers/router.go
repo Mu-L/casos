@@ -213,7 +213,7 @@ func InitAPI() {
 	beego.Router("/api/get-helm-operation-task", &controllers.ApiController{}, "GET:GetHelmOperationTask")
 	beego.Router("/api/get-helm-release-operation", &controllers.ApiController{}, "GET:GetHelmReleaseOperation")
 	beego.Router("/api/get-unfinished-helm-installs", &controllers.ApiController{}, "GET:GetUnfinishedHelmInstalls")
-	beego.Router("/api/delete-helm-operation-task", &controllers.ApiController{}, "POST:DeleteHelmOperationTask")
+	beego.Router("/api/delete-failed-helm-install", &controllers.ApiController{}, "POST:DeleteFailedHelmInstall")
 	beego.Router("/api/upgrade-helm-release", &controllers.ApiController{}, "POST:UpgradeHelmRelease")
 	beego.Router("/api/rollback-helm-release", &controllers.ApiController{}, "POST:RollbackHelmRelease")
 	beego.Router("/api/uninstall-helm-release", &controllers.ApiController{}, "POST:UninstallHelmRelease")

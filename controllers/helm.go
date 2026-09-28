@@ -512,9 +512,9 @@ func (c *ApiController) GetUnfinishedHelmInstalls() {
 	c.ResponseOk(tasks)
 }
 
-// DeleteHelmOperationTask removes a finished task, so a failed install leaves the apps list.
-// @router /api/delete-helm-operation-task [post]
-func (c *ApiController) DeleteHelmOperationTask() {
+// DeleteFailedHelmInstall takes a failed install off the apps list.
+// @router /api/delete-failed-helm-install [post]
+func (c *ApiController) DeleteFailedHelmInstall() {
 	if c.RequireAdmin() {
 		return
 	}
@@ -525,7 +525,7 @@ func (c *ApiController) DeleteHelmOperationTask() {
 		c.ResponseError("invalid task id")
 		return
 	}
-	if err := object.DeleteFinishedHelmOperationTask(req.Id); err != nil {
+	if err := object.DeleteFailedHelmInstall(req.Id); err != nil {
 		c.ResponseError(err.Error())
 		return
 	}

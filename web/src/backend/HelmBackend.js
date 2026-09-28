@@ -49,8 +49,8 @@ export function getUnfinishedHelmInstalls(namespace = "all") {
   }).then(r => r.json());
 }
 
-export function deleteHelmOperationTask(id) {
-  return fetch(`${Setting.ServerUrl}/api/delete-helm-operation-task`, {
+export function deleteFailedHelmInstall(id) {
+  return fetch(`${Setting.ServerUrl}/api/delete-failed-helm-install`, {
     method: "POST", credentials: "include", headers: jsonHeaders(), body: JSON.stringify({id: Number(id)}),
   }).then(r => r.json());
 }

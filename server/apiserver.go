@@ -147,8 +147,13 @@ func kineEndpointConfig(datastoreEndpoint string, port int) endpoint.Config {
 		Endpoint:            datastoreEndpoint,
 		Listener:            fmt.Sprintf("tcp://%s:%d", kineBindAddress, port),
 		EmulatedETCDVersion: "3.6.11",
-		CompactBatchSize:    100,
-		NotifyInterval:      time.Second,
+		// kine's own defaults (pkg/app) only apply to its command line; a zero
+		// CompactTimeout makes every compaction time out before it begins.
+		CompactTimeout:   5 * time.Second,
+		CompactMinRetain: 1000,
+		CompactBatchSize: 100,
+		PollBatchSize:    500,
+		NotifyInterval:   time.Second,
 	}
 }
 

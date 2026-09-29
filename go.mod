@@ -3,12 +3,11 @@ module github.com/casosorg/casos
 go 1.26.5
 
 replace (
-
 	// headscale's gorm driver links a fork of modernc.org/sqlite that
 	// registers the same driver name; see third_party/glebarez-go-sqlite
 	github.com/glebarez/go-sqlite => ./third_party/glebarez-go-sqlite
 	// kine -> our own fork
-	github.com/k3s-io/kine => github.com/casosorg/kine v0.16.2-r2
+	github.com/k3s-io/kine => github.com/casosorg/kine v0.16.2-r3
 
 	// beego pins v2.0.3+incompatible (pre-modules tag) but kine needs SetFileControlInt
 	// from v1.14.x; force the newer v1 release via replace
@@ -92,9 +91,11 @@ require (
 	github.com/juanfont/headscale v0.29.4
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
+	go.etcd.io/etcd/server/v3 v3.6.11
 	golang.org/x/crypto v0.53.0
 	golang.org/x/net v0.56.0
 	golang.org/x/sys v0.46.0
+	google.golang.org/grpc v1.81.1
 	gopkg.in/yaml.v3 v3.0.1
 	helm.sh/helm/v3 v3.21.2
 	k8s.io/api v1.36.1-k3s1
@@ -343,7 +344,6 @@ require (
 	go.etcd.io/etcd/api/v3 v3.6.12 // indirect
 	go.etcd.io/etcd/client/pkg/v3 v3.6.12 // indirect
 	go.etcd.io/etcd/pkg/v3 v3.6.12 // indirect
-	go.etcd.io/etcd/server/v3 v3.6.11 // indirect
 	go.etcd.io/raft/v3 v3.6.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.65.0 // indirect
@@ -372,7 +372,6 @@ require (
 	golang.zx2c4.com/wireguard/windows v0.5.3 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260610212136-7ab31c22f7ad // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260526163538-3dc84a4a5aaa // indirect
-	google.golang.org/grpc v1.81.1 // indirect
 	google.golang.org/protobuf v1.36.12-0.20260120151049-f2248ac996af // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	gopkg.in/go-jose/go-jose.v2 v2.6.3 // indirect

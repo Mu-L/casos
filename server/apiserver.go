@@ -72,9 +72,14 @@ func Start(ctx context.Context, cfg Config) (<-chan struct{}, error) {
 	if kinePort != kineDefaultPort {
 		logrus.Warnf("port %d is taken by another program, kine is using %d instead", kineDefaultPort, kinePort)
 	}
-	etcdCfg, err := endpoint.Listen(ctx, kineEndpointConfig(cfg.DatastoreEndpoint, kinePort))
+	kineCfg := kineEndpointConfig(cfg.DatastoreEndpoint, kinePort)
+	kineCfg.GRPCServer = newKineGRPCServer(cfg.KineQueryTimeout)
+	etcdCfg, err := endpoint.Listen(ctx, kineCfg)
 	if err != nil {
 		return nil, fmt.Errorf("kine listen: %w", err)
+	}
+	if err := startKineWalCheckpointer(ctx, cfg.DatastoreEndpoint, cfg.KineCheckpointInterval); err != nil {
+		logrus.Warnf("kine WAL checkpoints disabled: %v", err)
 	}
 	if len(etcdCfg.Endpoints) == 0 {
 		return nil, fmt.Errorf("kine started without an etcd endpoint")

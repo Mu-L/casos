@@ -5,6 +5,7 @@ import (
 	"net"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/casosorg/casos/conf"
 	kinesqlite "github.com/k3s-io/kine/pkg/drivers/sqlite"
@@ -34,6 +35,8 @@ type Config struct {
 	ServiceLBEnabled          bool               // run the built-in bare-metal LoadBalancer controller
 	MeshOverlayIP             string             // the hub's overlay address when this is a mesh hub, else empty
 	EgressProxySocket         string             // Unix socket of an HTTP CONNECT proxy for the apiserver's traffic to the cluster, else empty
+	KineQueryTimeout          time.Duration      // deadline of a kine Range query, 0 = none
+	KineCheckpointInterval    time.Duration      // how often a large SQLite WAL is truncated, 0 = never
 }
 
 // CasOS keeps every port it binds on a fixed number in one 20000 block, rather
@@ -131,6 +134,8 @@ func ConfigFromAppConf() (Config, error) {
 		RegistryMirrorMode:        registryMirrorMode,
 		IngressControllerEnabled:  ingressControllerEnabled,
 		ServiceLBEnabled:          serviceLBEnabled,
+		KineQueryTimeout:          kineDurationConfig("kineQueryTimeout", defaultKineQueryTimeout),
+		KineCheckpointInterval:    kineDurationConfig("kineCheckpointInterval", defaultKineCheckpointInterval),
 	}
 	normalizeApplicationAccessConfig(&config)
 	return config, nil
